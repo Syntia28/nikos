@@ -1,10 +1,13 @@
 export interface Producto {
-    id: string;
+    
     nombre: string;
     descripcion: string;
-    tamaño: string;
+    tamanio: string;
     precio: number;
     imagenUrl: string;
     stock: number;
     createdAt: Date;
+}
+export interface ProductoId extends Producto {
+    id: string;
 }

@@ -1,0 +1,1 @@
+export type COLLECTIONS_DATABASE = 'productos' | 'usuarios' | 'tamanios' ;

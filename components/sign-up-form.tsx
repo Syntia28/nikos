@@ -12,86 +12,186 @@ import { Separator } from '@/components/ui/separator';
 import { Text } from '@/components/ui/text';
 import { Icon } from '@/components/ui/icon';
 import { Usuario } from '@/interfaces/usuario';
-import { Link } from 'expo-router';
-import { User, Mail, Lock, Phone, MapPin, UserCheck } from 'lucide-react-native';
-import * as React from 'react';
-import { Pressable, TextInput, View, ScrollView } from 'react-native';
+import { Link, router } from 'expo-router';
+import { User, Mail, Lock, Phone, MapPin, UserCheck, ChefHat, PizzaIcon, Flame, Pizza } from 'lucide-react-native';
+import { Pressable, TextInput, View, ScrollView, Image, ImageStyle, Alert } from 'react-native';
+import { useState } from 'react';
+import { useFireAuthenticaiton } from '@/shared/auth/firebaseAuth';
+import { useCrudFireStorage } from '@/shared/firestorage/CrudFireStorage';
 
-export function SignUpForm() {
-  const [formData, setFormData] = React.useState<Partial<Usuario>>({
+// Interfaz para los datos del formulario
+interface RegisterFormData {
+  nombre: string;
+  apellido: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  telefono: string;
+  direccion: string;
+}
+
+// Interfaz para el perfil de usuario en Firestore
+interface UserProfile {
+  uid: string;
+  nombre: string;
+  apellido: string;
+  email: string;
+  telefono: string;
+  direccion: string;
+  fechaRegistro: string;
+  emailVerified: boolean;
+}
+
+export default function SignUpForm() {
+  const [formData, setFormData] = useState<RegisterFormData>({
     nombre: '',
     apellido: '',
     email: '',
     password: '',
+    confirmPassword: '',
     telefono: '',
     direccion: '',
-    confirmado: false
   });
+  const [loading, setLoading] = useState(false);
 
-  const [confirmPassword, setConfirmPassword] = React.useState('');
+  const { register } = useFireAuthenticaiton();
+  const { register: saveToFirestore } = useCrudFireStorage();
 
-  // Referencias para navegación entre campos
-  const apellidoInputRef = React.useRef<TextInput>(null);
-  const emailInputRef = React.useRef<TextInput>(null);
-  const passwordInputRef = React.useRef<TextInput>(null);
-  const confirmPasswordInputRef = React.useRef<TextInput>(null);
-  const telefonoInputRef = React.useRef<TextInput>(null);
-  const direccionInputRef = React.useRef<TextInput>(null);
+  const handleInputChange = (field: keyof RegisterFormData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
 
-  // Funciones de navegación entre campos
-  function onNombreSubmitEditing() {
-    apellidoInputRef.current?.focus();
-  }
-
-  function onApellidoSubmitEditing() {
-    emailInputRef.current?.focus();
-  }
-
-  function onEmailSubmitEditing() {
-    passwordInputRef.current?.focus();
-  }
-
-  function onPasswordSubmitEditing() {
-    confirmPasswordInputRef.current?.focus();
-  }
-
-  function onConfirmPasswordSubmitEditing() {
-    telefonoInputRef.current?.focus();
-  }
-
-  function onTelefonoSubmitEditing() {
-    direccionInputRef.current?.focus();
-  }
-
-  function onSubmit() {
-    // Validar que las contraseñas coincidan
-    if (formData.password !== confirmPassword) {
-      alert('Las contraseñas no coinciden');
-      return;
+  const validateForm = (): boolean => {
+    // Validar campos requeridos
+    if (!formData.nombre.trim()) {
+      Alert.alert('Error', 'El nombre es requerido');
+      return false;
+    }
+    if (!formData.apellido.trim()) {
+      Alert.alert('Error', 'El apellido es requerido');
+      return false;
+    }
+    if (!formData.email.trim()) {
+      Alert.alert('Error', 'El correo electrónico es requerido');
+      return false;
+    }
+    if (!formData.password.trim()) {
+      Alert.alert('Error', 'La contraseña es requerida');
+      return false;
+    }
+    if (!formData.confirmPassword.trim()) {
+      Alert.alert('Error', 'Confirmar contraseña es requerido');
+      return false;
+    }
+    if (!formData.telefono.trim()) {
+      Alert.alert('Error', 'El teléfono es requerido');
+      return false;
+    }
+    if (!formData.direccion.trim()) {
+      Alert.alert('Error', 'La dirección es requerida');
+      return false;
     }
 
-    // TODO: Validar datos y crear usuario
-    console.log('Datos del formulario:', formData);
-  }
+    // Validar formato de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      Alert.alert('Error', 'Por favor ingresa un correo electrónico válido');
+      return false;
+    }
 
-  function updateFormData(field: keyof Usuario, value: string) {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  }
+    // Validar contraseña
+    if (formData.password.length < 6) {
+      Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres');
+      return false;
+    }
+
+    // Validar que las contraseñas coincidan
+    if (formData.password !== formData.confirmPassword) {
+      Alert.alert('Error', 'Las contraseñas no coinciden');
+      return false;
+    }
+
+    // Validar teléfono (básico)
+    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+    if (!phoneRegex.test(formData.telefono.replace(/\s/g, ''))) {
+      Alert.alert('Error', 'Por favor ingresa un número de teléfono válido');
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleRegister = async () => {
+    if (!validateForm()) return;
+
+    setLoading(true);
+    try {
+      // 1. Registrar usuario en Firebase Auth
+      const user = await register(formData.email, formData.password);
+
+      // 2. Crear perfil de usuario en Firestore
+      const userProfile: UserProfile = {
+        uid: user.uid,
+        nombre: formData.nombre,
+        apellido: formData.apellido,
+        email: formData.email,
+        telefono: formData.telefono,
+        direccion: formData.direccion,
+        fechaRegistro: new Date().toISOString(),
+        emailVerified: user.emailVerified,
+      };
+
+      // 3. Guardar en la colección 'usuarios' con el UID como ID del documento
+      const result = await saveToFirestore('usuarios', userProfile);
+
+      if (result.success) {
+        console.log('✅ Perfil de usuario guardado exitosamente');
+        Alert.alert(
+          'Registro exitoso',
+          `¡Bienvenido ${formData.nombre} ${formData.apellido}!\n\n` +
+          `Tu perfil ha sido creado correctamente.\n` +
+          `Se ha enviado un correo de verificación a ${user.email}`
+        );
+        router.replace('/login');
+      } else {
+        console.error('❌ Error al guardar perfil:', result.error);
+        Alert.alert(
+          'Advertencia',
+          'Usuario creado pero hubo un problema al guardar el perfil completo. ' +
+          'Puedes completar tu perfil más tarde.'
+        );
+      }
+    } catch (error: any) {
+      console.error('Error en registro:', error);
+      Alert.alert('Error', error.message || 'No se pudo completar el registro');
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   return (
-    <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-      <View className="gap-6 p-6">
-        <Card className="border-pizza/20 shadow-lg shadow-pizza/10">
-          <CardHeader className="bg-gradient-to-r from-pizza/5 to-cheese/5 rounded-t-xl">
-            <View className="items-center mb-2">
-              <View className="w-16 h-16 bg-pizza/10 rounded-full items-center justify-center mb-3">
-                <Icon as={UserCheck} className="text-pizza size-8" />
-              </View>
+    <ScrollView className="bg-[#FFFFFF] dark:bg-[#1E1E1E]  flex-1" showsVerticalScrollIndicator={false}>
+      <View className=" ap-6 p-6">
+        <Card className="  bg-orange-100 dark:bg-[#292727]  shadow-lg shadow-pizza/10">
+          <View className="absolute inset-0 opacity-10">
+            <View className="flex-row flex-wrap">
+              {Array.from({ length: 154 }).map((_, i) => (
+                <View key={i} className="w-8 h-8 m-2">
+                  <Icon as={Pizza} className="text-black dark:text-white size-6" />
+                </View>
+              ))}
             </View>
-            <CardTitle className="text-center text-2xl text-pizza">
+          </View>
+
+          <CardHeader className="bg-gradient-to-r from-pizza/5 to-cheese/5 rounded-t-xl">
+            <View className="items-center gap-2 justify-center mb-2">
+              <Image source={require('@/assets/images/logo.png')} style={{ width: 150, height: 100 }} resizeMode="cover" />
+            </View>
+            <CardTitle className=" text-black dark:text-white text-center gap-2 justify-center text-2xl">
               ¡Únete a Nikos!
             </CardTitle>
-            <CardDescription className="text-center text-base">
+            <CardDescription className="text-center gap-2 justify-center text-base">
               Crea tu cuenta y disfruta de nuestras deliciosas pizzas con beneficios exclusivos
             </CardDescription>
           </CardHeader>
@@ -100,171 +200,144 @@ export function SignUpForm() {
             {/* Nombre y Apellido */}
             <View className="flex-row gap-3">
               <View className="flex-1 gap-2">
-                <Label htmlFor="nombre" className="flex-row items-center">
-                  <Icon as={User} className="text-pizza size-4 mr-2" />
-                  Nombre
+                <Label htmlFor="nombre" className="flex-row items-center gap-2 justify-center">
+                  <Icon as={User} className="text-black dark:text-white size-4 mr-4" />
+                  {" Nombre"}  
                 </Label>
-                <Input
-                  id="nombre"
-                  placeholder="Tu nombre"
+                <TextInput
+                  className='dark:bg-[#000000] bg-[#F9E4C6] rounded p-2  placeholder:text-black dark:placeholder:text-white'
+                  placeholder="Nombre *"
                   value={formData.nombre}
-                  onChangeText={(text) => updateFormData('nombre', text)}
-                  autoComplete="given-name"
+                  onChangeText={(text) => handleInputChange('nombre', text)}
+                  editable={!loading}
                   autoCapitalize="words"
-                  onSubmitEditing={onNombreSubmitEditing}
-                  returnKeyType="next"
-                  className="border-pizza/20 focus:border-pizza"
                 />
               </View>
 
               <View className="flex-1 gap-2">
-                <Label htmlFor="apellido" className="flex-row items-center">
-                  <Icon as={User} className="text-pizza size-4 mr-2" />
-                  Apellido
+                <Label htmlFor="apellido" className="flex-row items-center gap-2 justify-center">
+                  <Icon as={User} className="text-black dark:text-white size-4 mr-2" />
+                  {" Apellido"}
                 </Label>
-                <Input
-                  ref={apellidoInputRef}
-                  id="apellido"
-                  placeholder="Tu apellido"
+                <TextInput
+                  className='dark:bg-[#000000] bg-[#F9E4C6] rounded p-2  placeholder:text-black dark:placeholder:text-white'
+                  placeholder="Apellido *"
                   value={formData.apellido}
-                  onChangeText={(text) => updateFormData('apellido', text)}
-                  autoComplete="family-name"
+                  onChangeText={(text) => handleInputChange('apellido', text)}
+                  editable={!loading}
                   autoCapitalize="words"
-                  onSubmitEditing={onApellidoSubmitEditing}
-                  returnKeyType="next"
-                  className="border-pizza/20 focus:border-pizza"
                 />
               </View>
             </View>
 
             {/* Email */}
             <View className="gap-2">
-              <Label htmlFor="email" className="flex-row items-center">
-                <Icon as={Mail} className="text-pizza size-4 mr-2" />
-                Correo Electrónico
+              <Label htmlFor="email" className="flex-row items-center gap-2 justify-center">
+                <Icon as={Mail} className="text-black dark:text-white size-4 mr-2" />
+                {" Correo Electrónico"}
               </Label>
-              <Input
-                ref={emailInputRef}
-                id="email"
-                placeholder="tu@email.com"
+              <TextInput 
+                className='dark:bg-[#000000] bg-[#F9E4C6] rounded p-2  placeholder:text-black dark:placeholder:text-white'
+                placeholder="Correo electrónico *"
                 value={formData.email}
-                onChangeText={(text) => updateFormData('email', text)}
+                onChangeText={(text) => handleInputChange('email', text.toLowerCase())}
+                editable={!loading}
                 keyboardType="email-address"
-                autoComplete="email"
                 autoCapitalize="none"
-                onSubmitEditing={onEmailSubmitEditing}
-                returnKeyType="next"
-                className="border-pizza/20 focus:border-pizza"
+                autoCorrect={false}
               />
+
             </View>
 
             {/* Contraseña */}
             <View className="gap-2">
-              <Label htmlFor="password" className="flex-row items-center">
-                <Icon as={Lock} className="text-pizza size-4 mr-2" />
-                Contraseña
+              <Label htmlFor="password" className="flex-row items-center gap-2 justify-center">
+                <Icon as={Lock} className="text-black dark:text-white size-4 mr-2" />
+                {" Contraseña"}
               </Label>
-              <Input
-                ref={passwordInputRef}
-                id="password"
-                placeholder="Mínimo 8 caracteres"
-                value={formData.password}
-                onChangeText={(text) => updateFormData('password', text)}
+              <TextInput
+                className='dark:bg-[#000000] bg-[#F9E4C6] rounded p-2  placeholder:text-black dark:placeholder:text-white'
+                placeholder="Contraseña * (mínimo 6 caracteres)"
                 secureTextEntry
-                onSubmitEditing={onPasswordSubmitEditing}
-                returnKeyType="next"
-                className="border-pizza/20 focus:border-pizza"
+                value={formData.password}
+                onChangeText={(text) => handleInputChange('password', text)}
+                editable={!loading}
+                autoCapitalize="none"
+                autoCorrect={false}
               />
             </View>
 
             {/* Confirmar Contraseña */}
             <View className="gap-2">
-              <Label htmlFor="confirmPassword" className="flex-row items-center">
-                <Icon as={Lock} className="text-pizza size-4 mr-2" />
-                Confirmar Contraseña
+              <Label htmlFor="confirmPassword" className="flex-row items-center gap-2 justify-center">
+                <Icon as={Lock} className="text-black dark:text-white size-4 mr-2" />
+                {" Confirmar Contraseña"}
               </Label>
-              <Input
-                ref={confirmPasswordInputRef}
-                id="confirmPassword"
-                placeholder="Repite tu contraseña"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
+              <TextInput
+                className='dark:bg-[#000000] bg-[#F9E4C6] rounded p-2  placeholder:text-black dark:placeholder:text-white'
+                placeholder="Confirmar contraseña *"
                 secureTextEntry
-                onSubmitEditing={onConfirmPasswordSubmitEditing}
-                returnKeyType="next"
-                className={`border-pizza/20 focus:border-pizza ${confirmPassword && formData.password !== confirmPassword
-                    ? 'border-red-500'
-                    : confirmPassword && formData.password === confirmPassword
-                      ? 'border-green-500'
-                      : ''
-                  }`}
+                value={formData.confirmPassword}
+                onChangeText={(text) => handleInputChange('confirmPassword', text)}
+                editable={!loading}
+                autoCapitalize="none"
+                autoCorrect={false}
               />
-              {confirmPassword && formData.password !== confirmPassword && (
-                <Text className="text-red-500 text-sm">Las contraseñas no coinciden</Text>
-              )}
-              {confirmPassword && formData.password === confirmPassword && (
-                <Text className="text-green-500 text-sm">✓ Las contraseñas coinciden</Text>
-              )}
             </View>
 
             {/* Teléfono */}
             <View className="gap-2">
-              <Label htmlFor="telefono" className="flex-row items-center">
-                <Icon as={Phone} className="text-pizza size-4 mr-2" />
-                Teléfono
+              <Label htmlFor="telefono" className="flex-row items-center gap-2 justify-center">
+                <Icon as={Phone} className="text-black dark:text-white size-4 mr-2" />
+                {" Teléfono"}
               </Label>
-              <Input
-                ref={telefonoInputRef}
-                id="telefono"
-                placeholder="+1 (555) 123-4567"
+              <TextInput
+                className='dark:bg-[#000000] bg-[#F9E4C6] rounded p-2  placeholder:text-black dark:placeholder:text-white'
+                placeholder="Teléfono * (ej: +1234567890)"
                 value={formData.telefono}
-                onChangeText={(text) => updateFormData('telefono', text)}
+                onChangeText={(text) => handleInputChange('telefono', text)}
+                editable={!loading}
                 keyboardType="phone-pad"
-                autoComplete="tel"
-                onSubmitEditing={onTelefonoSubmitEditing}
-                returnKeyType="next"
-                className="border-pizza/20 focus:border-pizza"
               />
             </View>
 
             {/* Dirección */}
             <View className="gap-2">
-              <Label htmlFor="direccion" className="flex-row items-center">
-                <Icon as={MapPin} className="text-pizza size-4 mr-2" />
-                Dirección de Entrega
+              <Label htmlFor="direccion" className="flex-row items-center gap-2 justify-center">
+                <Icon as={MapPin} className="text-black dark:text-white size-4 mr-2" />
+                {" Dirección de Entrega"}
               </Label>
-              <Input
-                ref={direccionInputRef}
-                id="direccion"
-                placeholder="Calle, número, colonia, ciudad"
+              <TextInput
+                className='dark:bg-[#000000] bg-[#F9E4C6] rounded p-2  placeholder:text-black dark:placeholder:text-white'
+                placeholder="Dirección completa *"
                 value={formData.direccion}
-                onChangeText={(text) => updateFormData('direccion', text)}
-                autoComplete="street-address"
-                autoCapitalize="words"
-                onSubmitEditing={onSubmit}
-                returnKeyType="done"
-                className="border-pizza/20 focus:border-pizza"
+                onChangeText={(text) => handleInputChange('direccion', text)}
+                editable={!loading}
                 multiline
-                numberOfLines={2}
+                numberOfLines={3}
+                textAlignVertical="top"
               />
             </View>
 
             {/* Botón de registro */}
             <Button
-              className="w-full bg-pizza hover:bg-pizza/90 h-12 rounded-xl shadow-lg shadow-pizza/25"
-              onPress={onSubmit}
+              className="bg-orange-200 dark:bg-black w-full h-12 rounded-xl shadow-lg shadow-pizza/25"
+              onPress={handleRegister}
+              disabled={loading}
             >
-              <View className="flex-row items-center">
-                <Icon as={UserCheck} className="text-white size-5 mr-2" />
-                <Text className="text-white font-semibold text-lg">Crear Mi Cuenta</Text>
+              <View className=" flex-row  items-center gap-2 justify-center">
+                <Icon as={UserCheck} className="text-black dark:text-white size-5 mr-2" />
+                <Text className="text-black dark:text-white font-semibold text-lg">
+                  {loading ? "Registrando..." : "Crear Cuenta"}
+                </Text>
               </View>
             </Button>
 
             {/* Link a login */}
-            <Text className="text-center text-sm text-muted-foreground">
+            <Text className="text-center gap-2 justify-center text-sm text-muted-foreground">
               ¿Ya tienes una cuenta?{' '}
               <Link href={'/login'}>
-                <Text className="text-pizza font-medium underline underline-offset-4">
+                <Text className="text-black dark:text-white font-medium underline underline-offset-4">
                   Iniciar Sesión
                 </Text>
               </Link>
@@ -272,11 +345,11 @@ export function SignUpForm() {
 
             {/* Información adicional */}
             <View className="bg-cheese/10 p-4 rounded-xl border border-cheese/20 mt-4">
-              <Text className="text-center text-sm text-muted-foreground">
+              <Text className="text-center gap-2 justify-center text-sm text-muted-foreground">
                 Al registrarte aceptas nuestros{' '}
-                <Text className="text-pizza underline">Términos y Condiciones</Text>
+                <Text className="text-black dark:text-white underline">Términos y Condiciones</Text>
                 {' '}y{' '}
-                <Text className="text-pizza underline">Política de Privacidad</Text>
+                <Text className="text-black dark:text-white underline">Política de Privacidad</Text>
               </Text>
             </View>
           </CardContent>

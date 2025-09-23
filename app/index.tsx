@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { THEME } from '@/lib/theme';
-import { Link, Stack } from 'expo-router';
+import { Link, Stack, router } from 'expo-router';
 import {
   MoonStarIcon,
   StarIcon,
@@ -13,7 +13,10 @@ import {
   ChefHat,
   Clock,
   Heart,
-  MapPin
+  MapPin,
+  LogIn,
+  User,
+  Home
 } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import * as React from 'react';
@@ -25,12 +28,15 @@ import {
   Dimensions,
   ImageBackground
 } from 'react-native';
+import { useFireAuthenticaiton } from '@/shared/auth/firebaseAuth';
+import { useState, useEffect } from 'react';
+import { User as FirebaseUser } from 'firebase/auth';
 
 const { width } = Dimensions.get('window');
 
 const SCREEN_OPTIONS = {
   light: {
-    title: 'Nikos Pizzería',
+    title: 'Pizzeria Niko´s',
     headerTransparent: true,
     headerShadowVisible: false,
     headerStyle: { backgroundColor: 'transparent' },
@@ -38,7 +44,7 @@ const SCREEN_OPTIONS = {
     headerRight: () => <ThemeToggle />,
   },
   dark: {
-    title: 'Nikos Pizzería',
+    title: 'Pizzeria Niko´s',
     headerTransparent: true,
     headerShadowVisible: false,
     headerStyle: { backgroundColor: 'transparent' },
@@ -48,12 +54,37 @@ const SCREEN_OPTIONS = {
 };
 
 const IMAGE_STYLE: ImageStyle = {
-  height: 76,
-  width: 76,
+  height: 100,
+  width: 150,
 };
 
 export default function Screen() {
   const { colorScheme } = useColorScheme();
+  const { onAuthChange } = useFireAuthenticaiton();
+
+  // Estado local para manejar el usuario y loading
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // Usar el onAuthChange de tu hook para escuchar cambios
+  useEffect(() => {
+    const unsubscribe = onAuthChange((currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+    });
+
+    // Cleanup al desmontar el componente
+    return unsubscribe;
+  }, []);
+
+  // Si está cargando, mostrar un indicador
+  if (authLoading) {
+    return (
+      <View className="flex-1 bg-background justify-center items-center">
+        <Text className="text-foreground">Cargando...</Text>
+      </View>
+    );
+  }
 
   return (
     <>
@@ -65,9 +96,9 @@ export default function Screen() {
           {/* Background Pattern */}
           <View className="absolute inset-0 opacity-10">
             <View className="flex-row flex-wrap">
-              {Array.from({ length: 20 }).map((_, i) => (
+              {Array.from({ length: 60 }).map((_, i) => (
                 <View key={i} className="w-8 h-8 m-2">
-                  <Icon as={Pizza} className="text-white size-6" />
+                  <Icon as={Pizza} className="text-black dark:text-white size-6" />
                 </View>
               ))}
             </View>
@@ -75,19 +106,13 @@ export default function Screen() {
 
           {/* Hero Content */}
           <View className="items-center px-6 z-10">
-            <View className="items-center justify-center w-20 h-20 bg-white/20 rounded-full mb-4 backdrop-blur-sm">
-              <Icon as={Pizza} className="text-white size-12" />
-            </View>
+            <Image source={require('@/assets/images/logo.png')} style={IMAGE_STYLE} />
 
-            <Text className="text-white text-4xl font-bold text-center mb-2">
-              Nikos Pizzería
-            </Text>
-
-            <Text className="text-white/90 text-lg text-center mb-6 font-medium">
+            <Text className="text-blue-950 dark:text-green-200 text-lg text-center mb-6 font-medium">
               Sabores auténticos desde 2021
             </Text>
 
-            <View className="flex-row items-center bg-white/20 px-4 py-2 rounded-full backdrop-blur-sm">
+            <View className="flex-row items-center bg-orange-400 px-4 py-2 rounded-full backdrop-blur-sm">
               <Icon as={Flame} className="text-white size-4 mr-2" />
               <Text className="text-white font-medium">Horneado a la leña</Text>
             </View>
@@ -96,43 +121,52 @@ export default function Screen() {
 
         {/* Welcome Message */}
         <View className="px-6 py-8">
-          <Card className="border-l-4 border-l-pizza">
+          <Card className="bg-orange-200 dark:bg-black border-l-4 border-l-pizza">
             <CardHeader>
-              <CardTitle className="text-2xl text-pizza flex-row items-center">
-                <Icon as={ChefHat} className="text-pizza size-6 mr-2" />
-                ¡Bienvenido a Nikos!
+              <CardTitle className="dark:text-white text-2xl text-pizza flex-row items-center">
+                <Icon as={ChefHat} className="dark:text-white text-pizza size-6 mr-2" />
+                {user ? `¡Bienvenido de nuevo!` : `¡Bienvenido a Niko´s!`}
               </CardTitle>
               <CardDescription className="text-base">
-                Descubre nuestras deliciosas pizzas artesanales preparadas con ingredientes frescos y amor.
+                {user
+                  ? `Hola ${user.email}, disfruta de nuestras deliciosas pizzas artesanales.`
+                  : `Descubre nuestras deliciosas pizzas artesanales preparadas con ingredientes frescos y amor.`
+                }
               </CardDescription>
             </CardHeader>
           </Card>
         </View>
 
-        {/* Quick Actions */}
+        {/* Quick Actions - Mostrar condicionalmente según autenticación */}
         <View className="px-6 pb-8">
           <Text className="text-xl font-bold mb-4 text-foreground">
-            Comienza tu experiencia
+            {user ? 'Tu experiencia' : 'Comienza tu experiencia'}
           </Text>
 
           <View className="gap-4">
-            <Link href="/login" asChild>
-              <Button className="bg-pizza hover:bg-pizza/90 h-14 rounded-2xl shadow-lg shadow-pizza/25">
-                <View className="flex-row items-center">
-                  <Icon as={Heart} className="text-white size-5 mr-3" />
-                  <Text className="text-white text-lg font-semibold">Iniciar Sesión</Text>
-                </View>
-              </Button>
-            </Link>
+            {!user &&
+              // Mostrar botones de login/registro si NO está autenticado
+              <>
+                <Link href="/login" asChild>
+                  <Button variant="outline" className="bg-orange-200 dark:bg-black h-14 rounded-2xl border-2 border-pizza/20">
+                    <View className="flex-row items-center">
+                      <Icon as={LogIn} className="text-black dark:text-white size-5 mr-3" />
+                      <Text className="dark:text-white text-pizza text-lg font-semibold">Iniciar Sesión</Text>
+                    </View>
+                  </Button>
+                </Link>
 
-            <Link href="/register" asChild>
-              <Button variant="outline" className="h-14 rounded-2xl border-2 border-pizza/20">
-                <View className="flex-row items-center">
-                  <Icon as={StarIcon} className="text-pizza size-5 mr-3" />
-                  <Text className="text-pizza text-lg font-semibold">Registrarse</Text>
-                </View>
-              </Button>
-            </Link>
+                <Link href="/register" asChild>
+                  <Button variant="outline" className="bg-orange-200 dark:bg-black h-14 rounded-2xl border-2 border-pizza/20">
+                    <View className="flex-row items-center">
+                      <Icon as={StarIcon} className="text-black dark:text-white size-5 mr-3" />
+                      <Text className="dark:text-white text-lg font-semibold">Registrarse</Text>
+                    </View>
+                  </Button>
+                </Link>
+              </>
+             
+            }
           </View>
         </View>
 
@@ -144,9 +178,9 @@ export default function Screen() {
 
           <View className="flex-row flex-wrap gap-4">
             <View className="flex-1 min-w-[160px]">
-              <Card className="h-32">
+              <Card className="bg-orange-200 dark:bg-black h-32">
                 <CardContent className="items-center justify-center flex-1 p-4">
-                  <Icon as={Clock} className="text-pizza size-8 mb-2" />
+                  <Icon as={Clock} className="text-black dark:text-white size-8 mb-2" />
                   <Text className="font-semibold text-center">Entrega Rápida</Text>
                   <Text className="text-sm text-muted-foreground text-center">30 min máximo</Text>
                 </CardContent>
@@ -154,9 +188,9 @@ export default function Screen() {
             </View>
 
             <View className="flex-1 min-w-[160px]">
-              <Card className="h-32">
+              <Card className="bg-orange-200 dark:bg-black h-32">
                 <CardContent className="items-center justify-center flex-1 p-4">
-                  <Icon as={ChefHat} className="text-pizza size-8 mb-2" />
+                  <Icon as={ChefHat} className="text-black dark:text-white size-8 mb-2" />
                   <Text className="font-semibold text-center">Ingredientes Frescos</Text>
                   <Text className="text-sm text-muted-foreground text-center">Calidad premium</Text>
                 </CardContent>
@@ -167,10 +201,10 @@ export default function Screen() {
 
         {/* Location Info */}
         <View className="px-6 pb-32">
-          <Card className="bg-gradient-to-r from-cheese/10 to-pizza/10 border-cheese/30">
+          <Card className="bg-orange-200 dark:bg-black from-cheese/10 to-pizza/10 border-cheese/30">
             <CardContent className="p-6">
               <View className="flex-row items-center mb-3">
-                <Icon as={MapPin} className="text-pizza size-5 mr-2" />
+                <Icon as={MapPin} className="text-black dark:text-white size-5 mr-2" />
                 <Text className="font-semibold text-lg">Encuéntranos</Text>
               </View>
               <Text className="text-muted-foreground mb-2">
