@@ -3,6 +3,7 @@ import { Text } from '@/components/ui/text';
 import { Icon } from '@/components/ui/icon';
 import { cn } from '@/lib/utils';
 import { Home, ShoppingBag, User } from 'lucide-react-native';
+import { CarritoModal } from '@/components/ui/carrito-modal';
 import { router } from 'expo-router';
 import * as React from 'react';
 import { useState, useEffect } from 'react';
@@ -32,10 +33,16 @@ const baseTabs: TabItem[] = [
         label: 'Menú',
     },
     {
-        name: 'orders',
+        name: 'pedidos',
         icon: ShoppingBag,
-        href: '/orders',
+        href: '/pedidos',
         label: 'Pedidos',
+    },
+    {
+        name: 'carrito',
+        icon: ShoppingBag,
+        href: '/carrito',
+        label: 'Carrito',
     },
 ];
 
@@ -112,7 +119,6 @@ export function BottomNavigation() {
             <View className="flex-row items-center justify-around px-4 py-2">
                 {tabsToShow.map((tab) => {
                     const isActive = activeTab === tab.href;
-
                     return (
                         <TouchableOpacity
                             key={tab.name}
@@ -123,7 +129,6 @@ export function BottomNavigation() {
                             )}
                             activeOpacity={0.7}
                         >
-                            {/* Icon container with pizza-themed styling */}
                             <View
                                 className={cn(
                                     "items-center justify-center w-8 h-8 rounded-full mb-1",
@@ -147,8 +152,6 @@ export function BottomNavigation() {
                                     />
                                 </View>
                             </View>
-
-                            {/* Label */}
                             <Text className={cn(
                                 "text-xs font-medium",
                                 isActive
@@ -157,14 +160,13 @@ export function BottomNavigation() {
                             )}>
                                 {tab.label}
                             </Text>
-
-                            {/* Active indicator dot */}
                             {isActive && (
                                 <View className="w-1 h-1 bg-pizza rounded-full mt-1" />
                             )}
                         </TouchableOpacity>
                     );
                 })}
+                
             </View>
         </View>
     );

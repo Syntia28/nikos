@@ -24,7 +24,7 @@ import {
 } from 'lucide-react-native';
 
 // Interfaz para el perfil completo del usuario
-interface UserProfile {
+export interface UserProfile {
     uid: string;
     nombre: string;
     apellido: string;
@@ -141,7 +141,7 @@ export default function ProfileScreen() {
                         headerStyle: { backgroundColor: '#D49744' },
                         headerTintColor: 'white',
                         headerTitleStyle: { fontWeight: 'bold' }
-                    }}
+                    }}      
                 />
                 <View className="flex-1 justify-center items-center bg-background p-6">
                     <Text className="text-foreground text-lg mb-4 text-center">

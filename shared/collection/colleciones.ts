@@ -1,1 +1,1 @@
-export type COLLECTIONS_DATABASE = 'productos' | 'usuarios' | 'tamanios' ;
+export type COLLECTIONS_DATABASE = 'productos' | 'usuarios' | 'tamanios' | 'carritos' | 'historial' ;

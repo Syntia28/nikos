@@ -1,4 +1,4 @@
-import { ProductoId } from '@/interfaces/producto';
+import { ProductoWithId } from '@/interfaces/producto';
 import { useCrudFireStorage } from '@/shared/firestorage/CrudFireStorage';
 import { useMemo, useState } from 'react';
 
@@ -6,7 +6,7 @@ export function useProductos() {
   const { getById, getAll } = useCrudFireStorage();
 
   // Estados para las listas
-  const [productos, setProductos] = useState<ProductoId[]>([]);
+  const [productos, setProductos] = useState<ProductoWithId[]>([]);
 
   // Estados para búsqueda
   const [searchValue, setSearchValue] = useState('');
@@ -28,7 +28,7 @@ export function useProductos() {
     }
 
     return productos.filter((producto) => {
-      const value = producto[searchField as keyof ProductoId];
+      const value = producto[searchField as keyof ProductoWithId];
       if (typeof value === 'string') {
         return value.toLowerCase().includes(searchValue.toLowerCase());
       }
@@ -39,7 +39,7 @@ export function useProductos() {
   // Función para obtener un producto por ID
   const GetById = async (productId: string): Promise<any | null> => {
     try {
-      const result = await getById<ProductoId>(productId, 'productos');
+      const result = await getById<ProductoWithId>(productId, 'productos');
       if (result.success && result.data) {
         return result.data;
       }
@@ -54,7 +54,7 @@ export function useProductos() {
   const GetAll = async () => {
     setLoading(true);
     try {
-      const data = await getAll<ProductoId>('productos');
+      const data = await getAll<ProductoWithId>('productos');
       const productList = data.data || [];
       setProductos(productList);
     } catch (error) {

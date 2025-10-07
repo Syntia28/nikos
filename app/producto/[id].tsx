@@ -4,14 +4,15 @@ import { Stack } from 'expo-router';
 import { ScrollView, Text, View, Image, Dimensions, Alert, TouchableOpacity } from 'react-native';
 import { useProductos } from '@/hooks/productos.hook';
 import { useEffect, useState } from 'react';
-import { ProductoId } from '@/interfaces/producto';
+import { ProductoWithId } from '@/interfaces/producto';
+import { AgregarAlCarrito } from '@/components/AgregarAlCArrito';
 
 
 export default function DetalleScreen() {
     const { id } = useLocalSearchParams();
     const { GetById } = useProductos();
 
-    const [producto, setProducto] = useState<ProductoId | null>(null);
+    const [producto, setProducto] = useState<ProductoWithId | null>(null);
     const [loading, setLoading] = useState(true);
 
 
@@ -163,15 +164,12 @@ export default function DetalleScreen() {
                     </View>
 
                     {/* Botón de Agregar al Carrito */}
-                    <TouchableOpacity
-                        className={`rounded-lg py-4 mt-8 items-center shadow-lg ${hasStock ? 'bg-orange-300' : 'bg-gray-500'}`}
-                        onPress={handleAddToCart}
-                        disabled={!hasStock}
-                    >
-                        <Text className=" font-bold text-white dark:text-black text-lg">
-                            {hasStock ? `Agregar ${quantity} al Carrito` : 'Producto Agotado'} 🛒
-                        </Text>
-                    </TouchableOpacity>
+                   
+                    <AgregarAlCarrito
+                    className='bg-blue-600 '
+                        producto={producto}
+                        cantidad={quantity}
+                    />
                 </View>
             </ScrollView>
         </>
