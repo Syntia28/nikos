@@ -3,7 +3,6 @@ import { Text } from '@/components/ui/text';
 import { Icon } from '@/components/ui/icon';
 import { cn } from '@/lib/utils';
 import { Home, ShoppingBag, User } from 'lucide-react-native';
-import { CarritoModal } from '@/components/ui/carrito-modal';
 import { router } from 'expo-router';
 import * as React from 'react';
 import { useState, useEffect } from 'react';
