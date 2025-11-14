@@ -1,17 +1,26 @@
 import { Button } from '@/components/ui/button';
 import { Stack, router } from 'expo-router';
-import { ScrollView, Text, View, Image, TouchableOpacity } from 'react-native';
+import { ScrollView, Text, View, Image, TouchableOpacity, Modal, Pressable } from 'react-native';
 import { useHistorial } from '@/hooks/historial.hook';
-import { useFireAuthenticaiton } from '@/shared/auth/firebaseAuth';
+import { useAuthState } from '@/shared/auth/firebaseAuth';
 import { User } from 'firebase/auth';
-import { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { HistorialCompraWithId, ItemHistorialConProducto } from '@/interfaces/historial';
+import RatingCompra from '@/components/RatingCompra';
+import { CheckCircle, ChevronRight, Circle, Dot, Loader, LucideIcon, Package, Pizza, Truck, X } from 'lucide-react-native';
+import { Icon } from '@/components/ui/icon';
+import OrderStatusTracker from '@/components/SeguimientosEstadoTraking';
 
 const estados: Record<string, { bg: string; text: string; label: string }> = {
     completado: {
         bg: "bg-green-100 dark:bg-green-900",
         text: "text-green-800 dark:text-green-200",
         label: "✅ Completado",
+    },
+    entregado: {
+        bg: "bg-green-100 dark:bg-green-900",
+        text: "text-green-800 dark:text-green-200",
+        label: "✅ Entregado",
     },
     cancelado: {
         bg: "bg-red-100 dark:bg-red-900",
@@ -40,25 +49,29 @@ const estados: Record<string, { bg: string; text: string; label: string }> = {
     },
 };
 
+const activeEstados = Object.fromEntries(
+    Object.entries(estados).filter(([key]) => !['completado', 'entregado', 'cancelado'].includes(key))
+);
+
 type FiltroFecha = 'todos' | 'hoy' | '7dias' | '30dias';
 
-export default function HistorialScreen() {
-    const [user, setUser] = useState<User | null>(null);
-    const { onAuthChange } = useFireAuthenticaiton();
+export default function PedidosScreen() {
+    const { user, initializing } = useAuthState();
 
     // Estados de filtros
     const [filtroEstado, setFiltroEstado] = useState<string>('todos');
     const [filtroFecha, setFiltroFecha] = useState<FiltroFecha>('todos');
 
-    // Escuchar cambios en el estado de autenticación
+    // --- ESTADO PARA EL MODAL DE SEGUIMIENTO ---
+    const [isTrackingModalVisible, setTrackingModalVisible] = useState(false);
+    const [selectedOrderForTracking, setSelectedOrderForTracking] = useState<HistorialCompraWithId | null>(null);
+
+    // useAuthState maneja la suscripción a onAuthStateChanged
     useEffect(() => {
-        const unsubscribe = onAuthChange((currentUser) => {
-            setUser(currentUser);
-        });
-        return unsubscribe;
+        // placeholder to mark effect dependency if needed
     }, []);
 
-    const { historial, loading, loadHistorial } = useHistorial(user);
+    const { historial, loading, loadHistorial } = useHistorial(user as any);
 
     // Recargar historial cuando el usuario cambie
     useEffect(() => {
@@ -99,23 +112,49 @@ export default function HistorialScreen() {
         }
     };
 
-    // Historial filtrado usando useMemo para optimización
+    // Historial filtrado para pedidos activos
     const historialFiltrado = useMemo(() => {
+        const finishedStatuses = ['completado', 'entregado', 'cancelado'];
         return historial.filter(compra => {
+            const isFinished = finishedStatuses.includes(compra.estado);
+            if (isFinished) return false; // Excluir pedidos finalizados
+
             const cumpleEstado = filtroEstado === 'todos' || compra.estado === filtroEstado;
             const cumpleFecha = filtrarPorFecha(compra);
             return cumpleEstado && cumpleFecha;
         });
     }, [historial, filtroEstado, filtroFecha]);
 
+    // --- FUNCIONES PARA MANEJAR EL MODAL DE SEGUIMIENTO ---
+    const openTrackingModal = (compra: HistorialCompraWithId) => {
+        setSelectedOrderForTracking(compra);
+        setTrackingModalVisible(true);
+    };
+
+    const closeTrackingModal = () => {
+        setTrackingModalVisible(false);
+        setSelectedOrderForTracking(null);
+    };
+
+    if (initializing) {
+        return (
+            <>
+                <Stack.Screen options={{ title: 'Mis Pedidos' }} />
+                <View className="flex-1 bg-background items-center justify-center p-6">
+                    <Text className="text-lg text-muted-foreground">Cargando</Text>
+                </View>
+            </>
+        );
+    }
+
     if (!user) {
         return (
             <>
-                <Stack.Screen options={{ title: 'Historial de Compras' }} />
+                <Stack.Screen options={{ title: 'Mis Pedidos' }} />
                 <View className="flex-1 bg-background items-center justify-center p-6">
                     <Text className="text-2xl font-bold text-foreground mb-4">🔐 Inicia sesión</Text>
                     <Text className="text-muted-foreground text-center mb-6">
-                        Debes iniciar sesión para ver tu historial de compras
+                        Debes iniciar sesión para ver tus pedidos
                     </Text>
                     <Button onPress={() => router.push('/login')} className="bg-blue-600">
                         <Text className="text-white">Iniciar Sesión</Text>
@@ -127,14 +166,14 @@ export default function HistorialScreen() {
 
     return (
         <>
-            <Stack.Screen options={{ title: 'Historial de Compras' }} />
+            <Stack.Screen options={{ title: 'Mis Pedidos' }} />
             <ScrollView className="flex-1 bg-background">
                 <View className="p-6 gap-4">
                     {/* Header */}
                     <View className="flex-row justify-between items-center">
-                        <Text className="text-2xl font-bold text-foreground">📋 Mis Compras</Text>
+                        <Text className="text-2xl font-bold text-foreground">📋 Mis Pedidos Activos</Text>
                         <Text className="text-muted-foreground">
-                            {historialFiltrado.length} {historialFiltrado.length === 1 ? 'compra' : 'compras'}
+                            {historialFiltrado.length} {historialFiltrado.length === 1 ? 'pedido' : 'pedidos'}
                         </Text>
                     </View>
 
@@ -151,13 +190,12 @@ export default function HistorialScreen() {
                                             ? 'bg-blue-600 border-blue-600'
                                             : 'bg-card border-border'}`}
                                     >
-                                        <Text className={`text-sm font-semibold ${filtroEstado === 'todos'
-                                            ? 'text-white'
-                                            : 'text-muted-foreground'}`}>
+                                        <Text className={`text-sm font-semibold ${filtroEstado === 'todos' ? 'text-white' : 'text-muted-foreground'}`}>
                                             📦 Todos
                                         </Text>
                                     </TouchableOpacity>
-                                    {Object.entries(estados).map(([key, value]) => (
+
+                                    {Object.entries(activeEstados).map(([key, value]) => (
                                         <TouchableOpacity
                                             key={key}
                                             onPress={() => setFiltroEstado(key)}
@@ -165,9 +203,7 @@ export default function HistorialScreen() {
                                                 ? value.bg + ' ' + value.bg.replace('100', '200').replace('900', '800')
                                                 : 'bg-card border-border'}`}
                                         >
-                                            <Text className={`text-sm font-semibold ${filtroEstado === key
-                                                ? value.text
-                                                : 'text-muted-foreground'}`}>
+                                            <Text className={`text-sm font-semibold ${filtroEstado === key ? value.text : 'text-muted-foreground'}`}>
                                                 {value.label}
                                             </Text>
                                         </TouchableOpacity>
@@ -236,14 +272,14 @@ export default function HistorialScreen() {
 
                     {loading ? (
                         <View className="bg-card p-8 rounded-lg">
-                            <Text className="text-center text-muted-foreground">Cargando historial...</Text>
+                            <Text className="text-center text-muted-foreground">Cargando pedidos...</Text>
                         </View>
                     ) : historialFiltrado.length === 0 ? (
                         <View className="bg-card p-8 rounded-lg gap-4">
                             <Text className="text-center text-muted-foreground text-lg">
                                 {historial.length === 0
-                                    ? 'No tienes compras realizadas'
-                                    : 'No hay compras con los filtros seleccionados'}
+                                    ? 'No tienes pedidos activos'
+                                    : 'No hay pedidos con los filtros seleccionados'}
                             </Text>
                             {historial.length === 0 ? (
                                 <Button onPress={() => router.push('/carta')} className="bg-blue-600">
@@ -385,6 +421,44 @@ export default function HistorialScreen() {
                                         </View>
                                     )}
 
+                                    {/* Botón de seguimiento para pedidos activos */}
+                                    <View className="mt-4">
+                                        {(() => {
+                                            const tipoEntrega = compra.datosEntrega?.tipoEntrega;
+                                            const isFinished = ['completado', 'entregado', 'cancelado'].includes(compra.estado);
+
+                                            let IconComp: any = Truck;
+                                            let label = 'Seguimiento del Pedido';
+                                            let bgClass = 'bg-blue-600';
+
+                                            if (tipoEntrega === 'delivery') {
+                                                IconComp = Truck;
+                                                label = isFinished ? 'Ver detalle (Delivery)' : 'Rastrear envío';
+                                                bgClass = 'bg-blue-600';
+                                            } else if (tipoEntrega === 'recojo' || tipoEntrega === 'pickup' || tipoEntrega === 'store_pickup') {
+                                                IconComp = Package;
+                                                label = isFinished ? 'Ver detalle (Recojo)' : 'Listo para recojo';
+                                                bgClass = 'bg-purple-600';
+                                            } else {
+                                                IconComp = Truck;
+                                                label = isFinished ? 'Ver detalle' : 'Seguimiento del Pedido';
+                                            }
+
+                                            const routeType = tipoEntrega === 'delivery' ? 'delivery' : 'recojo';
+                                            return (
+                                                <Button
+                                                    onPress={() => router.push(`/seguimiento/${routeType}/${compra.id}`)}
+                                                    className={`${bgClass} flex-row items-center gap-2`}
+                                                >
+                                                    <Icon as={IconComp} className="text-white size-4" />
+                                                    <Text className="text-white font-semibold">
+                                                        {label}
+                                                    </Text>
+                                                </Button>
+                                            );
+                                        })()}
+                                    </View>
+
                                     {/* Footer con total */}
                                     <View className="mt-4 pt-4 border-t border-border flex-row justify-between items-center">
                                         <Text className="text-muted-foreground">Total pagado</Text>
@@ -405,6 +479,75 @@ export default function HistorialScreen() {
                     </View>
                 </View>
             </ScrollView>
+
+            {/* MODAL DE SEGUIMIENTO DE PEDIDO */}
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={isTrackingModalVisible}
+                onRequestClose={closeTrackingModal}
+            >
+                <Pressable onPress={closeTrackingModal} className="flex-1 justify-end bg-black/60">
+                    <Pressable className="bg-background rounded-t-2xl max-h-[70%]">
+                        {/* Header del Modal */}
+                        <View className="p-4 border-b border-border flex-row justify-between items-center">
+                            <View>
+                                <Text className="text-xl font-bold text-foreground">Estado del Pedido</Text>
+                                <Text className="text-sm text-muted-foreground">ID: {selectedOrderForTracking?.id.substring(0, 8)}...</Text>
+                            </View>
+                            <TouchableOpacity onPress={closeTrackingModal} className="p-2 rounded-full bg-muted">
+                                <X size={20} className="text-foreground" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Contenido del Modal (Barra de Progreso y detalles por tipo de entrega) */}
+                        <View className="p-6">
+                            <OrderStatusTracker order={selectedOrderForTracking} />
+
+                            {/* Detalles específicos según tipo de entrega */}
+                            {selectedOrderForTracking?.datosEntrega?.tipoEntrega === 'delivery' ? (
+                                <View className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                                    <Text className="font-semibold text-blue-800 mb-2">📦 Envío a domicilio</Text>
+                                    <Text className="text-sm text-blue-700">Dirección: {selectedOrderForTracking.datosEntrega.direccion}</Text>
+                                    <Text className="text-sm text-blue-700">Teléfono: {selectedOrderForTracking.datosEntrega.telefono}</Text>
+                                    {((selectedOrderForTracking.datosEntrega as any)?.repartidor) && (
+                                        <Text className="text-sm text-blue-700">Repartidor: {(selectedOrderForTracking.datosEntrega as any).repartidor}</Text>
+                                    )}
+                                    {/* Placeholder para tracking externo si existe */}
+                                    {((selectedOrderForTracking.datosEntrega as any)?.trackingUrl) ? (
+                                        <TouchableOpacity onPress={() => {
+                                            try {
+                                                // abrir url externa si está disponible
+                                                // Linking is not imported to avoid side-effects; wrap in try/catch
+                                                // You can import Linking from 'react-native' later if desired
+                                            } catch (e) {
+                                                console.warn('No se pudo abrir tracking url', e);
+                                            }
+                                        }} className="mt-3 bg-blue-600 px-3 py-2 rounded">
+                                            <Text className="text-white text-sm">Abrir seguimiento del repartidor</Text>
+                                        </TouchableOpacity>
+                                    ) : (
+                                        <Text className="text-sm text-muted-foreground mt-3">El seguimiento en tiempo real no está disponible</Text>
+                                    )}
+                                </View>
+                            ) : selectedOrderForTracking?.datosEntrega?.tipoEntrega === 'recojo' ? (
+                                <View className="mt-4 p-4 bg-purple-50 rounded-lg border border-purple-100">
+                                    <Text className="font-semibold text-purple-800 mb-2">📦 Recojo en tienda</Text>
+                                    <Text className="text-sm text-purple-700">Lugar: {selectedOrderForTracking.datosEntrega.direccion || 'Sucursal principal'}</Text>
+                                    {selectedOrderForTracking.datosEntrega.fechaRecojo ? (
+                                        <Text className="text-sm text-purple-700">Fecha de recojo: {new Date(selectedOrderForTracking.datosEntrega.fechaRecojo).toLocaleString()}</Text>
+                                    ) : (
+                                        <Text className="text-sm text-muted-foreground">Tu pedido estará listo para recojo próximamente</Text>
+                                    )}
+                                </View>
+                            ) : null}
+                        </View>
+
+                    </Pressable>
+                </Pressable>
+            </Modal>
         </>
     );
 }
+
+// OrderStatusTracker moved to components/OrderStatusTracker.tsx

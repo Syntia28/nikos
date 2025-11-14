@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Stack, router } from 'expo-router';
 import { ScrollView, Text, View, Image, TouchableOpacity, Alert } from 'react-native';
 import { useCarrito } from '@/hooks/carrito.hook';
-import { useFireAuthenticaiton } from '@/shared/auth/firebaseAuth';
+import { useAuthState } from '@/shared/auth/firebaseAuth';
 import { User } from 'firebase/auth';
 import ModalConfirmarCompra from '@/components/ModalConfirmarCompra';
 import { useCrudFireStorage } from '@/shared/firestorage/CrudFireStorage';
@@ -11,18 +11,14 @@ import { UserProfile } from './perfil';
 import { DatosEntrega } from '@/interfaces/historial';
 
 export default function CarritoScreen() {
-    const [user, setUser] = useState<User | null>(null);
-    const [userProfile, setUserProfile] = useState<UserProfile| null>(null);
+    const { user, initializing } = useAuthState();
+    const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [modalVisible, setModalVisible] = useState(false);
-    const { onAuthChange } = useFireAuthenticaiton();
     const { searchByField } = useCrudFireStorage();
 
-    // Escuchar cambios en el estado de autenticación
+    // Si la autenticación aún se inicializa, mostrar cargando para evitar flash de login
     useEffect(() => {
-        const unsubscribe = onAuthChange((currentUser) => {
-            setUser(currentUser);
-        });
-        return unsubscribe;
+        // nada aquí; useAuthState se encarga de la suscripción
     }, []);
 
     // Cargar perfil del usuario
@@ -86,6 +82,17 @@ export default function CarritoScreen() {
             },
         ]);
     };
+
+    if (initializing) {
+        return (
+            <>
+                <Stack.Screen options={{ title: 'Carrito de Compras' }} />
+                <View className="flex-1 bg-background items-center justify-center p-6">
+                    <Text className="text-lg text-muted-foreground">Cargando</Text>
+                </View>
+            </>
+        );
+    }
 
     if (!user) {
         return (

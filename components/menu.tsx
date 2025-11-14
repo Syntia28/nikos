@@ -165,7 +165,7 @@ export function BottomNavigation() {
                         </TouchableOpacity>
                     );
                 })}
-                
+
             </View>
         </View>
     );

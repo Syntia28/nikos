@@ -7,6 +7,7 @@ import {
   signOut,
   User as FirebaseUser,
 } from 'firebase/auth';
+import { useEffect, useState } from 'react';
 
 // Initialize Firebase Auth - en React Native, getAuth maneja persistencia automáticamente
 const auth = getAuth(app);
@@ -49,4 +50,20 @@ export function useFireAuthenticaiton() {
   }
 
   return { register, login, logout, onAuthChange };
+}
+
+// Hook conveniente para componentes que necesitan el usuario y estado de inicialización
+export function useAuthState() {
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [initializing, setInitializing] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setInitializing(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  return { user, initializing };
 }

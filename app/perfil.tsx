@@ -22,6 +22,7 @@ import {
     Gift,
     Pizza
 } from 'lucide-react-native';
+import HistorialCompleto from '@/components/HistorialCompleto';
 
 // Interfaz para el perfil completo del usuario
 export interface UserProfile {
@@ -331,7 +332,7 @@ export default function ProfileScreen() {
 
                         <Card className='bg-orange-100 dark:bg-black border-l-4 border-l-pizza'>
                             <CardContent className="p-0">
-                                <Button variant="ghost" className="w-full justify-start p-4 h-auto">
+                                <Button variant="ghost" className="w-full justify-start p-4 h-auto" onPress={() => router.push('/historial')}>
                                     <View className="flex-row items-center flex-1">
                                         <Icon as={Clock} className="text-muted-foreground size-5 mr-3" />
                                         <Text className="text-foreground">Historial de Pedidos</Text>
@@ -357,6 +358,17 @@ export default function ProfileScreen() {
                                     <View className="flex-row items-center flex-1">
                                         <Icon as={Settings} className="text-muted-foreground size-5 mr-3" />
                                         <Text className="text-foreground">Configuración</Text>
+                                    </View>
+                                </Button>
+                            </CardContent>
+                        </Card>
+                        <Card className='bg-orange-100 dark:bg-black border-l-4 border-l-pizza'>
+                            <CardContent className="p-0">
+                                <Button onPress={() => router.push(`/cambiarContraseña/${user.id}`)} variant="ghost" className="w-full justify-start p-4 h-auto">
+                                    <View className="flex-row items-center flex-1">
+
+                                        <Icon as={Settings} className="text-muted-foreground size-5 mr-3" />
+                                        <Text className="text-foreground">Cambiar contraseña</Text>
                                     </View>
                                 </Button>
                             </CardContent>
